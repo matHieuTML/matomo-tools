@@ -1,0 +1,238 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Analyseur d'URLs - Matomo Tools{% endblock %}
+
+{% block extra_styles %}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Analyseur d'URLs</h1>
+    <p>Analysez rapidement les performances de plusieurs URLs en même temps. Obtenez les statistiques de visites et de pages vues uniques pour une liste d'URLs et exportez facilement les résultats.</p>
+</div>
+
+<div class="container">
+    <div id="token-form" class="card fade-in">
+        <h2>Connexion à Matomo</h2>
+        <p>Pour commencer, connectez-vous avec votre token d'authentification Matomo. Vous pouvez le trouver dans les paramètres de votre compte Matomo sous "Sécurité".</p>
+        <div class="form-group">
+            <input type="text" id="token" name="token" placeholder="Votre token Matomo" required>
+            <button type="button" id="verify-token">Se connecter</button>
+        </div>
+    </div>
+
+    <div id="site-selector" class="card fade-in hidden">
+        <h2>Sélection du site</h2>
+        <p>Choisissez le site pour lequel vous souhaitez analyser les métriques.</p>
+        <select id="site-id" aria-label="Sélectionner un site Matomo" title="Site Matomo"></select>
+    </div>
+
+    <div id="url-form" class="card fade-in hidden">
+        <h2>Analyse d'URLs</h2>
+        <div class="period-selector">
+            <h3>Période d'analyse</h3>
+            <input type="text" id="period" name="period" class="daterange" readonly aria-label="Sélectionner une période" title="Période d'analyse">
+        </div>
+
+        <div class="input-method-selector">
+            <h3>Méthode d'entrée des URLs</h3>
+            <div class="toggle-group">
+                <button type="button" class="toggle-btn active" data-method="manual">Saisie manuelle</button>
+                <button type="button" class="toggle-btn" data-method="excel">Fichier Excel</button>
+            </div>
+        </div>
+
+        <form id="fetch-metrics-form" enctype="multipart/form-data">
+            <div id="manual-input">
+                <p>Collez vos URLs ci-dessous (une par ligne). Les URLs doivent être complètes et commencer par http:// ou https://.</p>
+                <textarea id="urls" name="urls" rows="8" placeholder="https://exemple.com/page1&#10;https://exemple.com/page2"></textarea>
+            </div>
+
+            <div id="excel-input" class="hidden">
+                <p>Sélectionnez un fichier Excel contenant vos URLs (une URL par ligne dans la première colonne).</p>
+                <input type="file" id="excel-file" name="excel-file" accept=".xlsx,.xls" aria-label="Sélectionner un fichier Excel" title="Fichier Excel des URLs">
+            </div>
+
+            <button type="submit">Analyser les URLs</button>
+        </form>
+    </div>
+
+    <div id="results" class="card fade-in hidden">
+        <h2>Résultats de l'analyse</h2>
+        <div class="results-period">Période : <span id="analysis-period"></span></div>
+        <div id="metrics-table"></div>
+        <button id="export-excel" class="mt-3">Exporter en Excel</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        // Configuration du sélecteur de période
+        $('#period').daterangepicker({
+            startDate: moment().subtract(7, 'days'),
+            endDate: moment(),
+            autoApply: true,
+            ranges: {
+               'Aujourd\'hui': [moment(), moment()],
+               'Hier': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+               '7 derniers jours': [moment().subtract(6, 'days'), moment()],
+               '30 derniers jours': [moment().subtract(29, 'days'), moment()],
+               'Ce mois': [moment().startOf('month'), moment().endOf('month')],
+               'Mois dernier': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+            },
+            locale: {
+                format: 'DD/MM/YYYY',
+                applyLabel: 'Appliquer',
+                cancelLabel: 'Annuler',
+                customRangeLabel: 'Période personnalisée'
+            }
+        });
+
+        // Initialisation : cacher l'input Excel et s'assurer que le manuel est visible
+        $('#excel-input').addClass('hidden');
+        $('#manual-input').removeClass('hidden');
+
+        // Gestion du toggle entre saisie manuelle et Excel
+        $('.toggle-btn').click(function() {
+            const method = $(this).data('method');
+            if (!$(this).hasClass('active')) {
+                $('.toggle-btn').removeClass('active');
+                $(this).addClass('active');
+                
+                if (method === 'manual') {
+                    $('#manual-input').removeClass('hidden');
+                    $('#excel-input').addClass('hidden');
+                    $('#urls').prop('required', true);
+                    $('#excel-file').prop('required', false);
+                } else {
+                    $('#manual-input').addClass('hidden');
+                    $('#excel-input').removeClass('hidden');
+                    $('#urls').prop('required', false);
+                    $('#excel-file').prop('required', true);
+                }
+            }
+        });
+
+        // Gestion de la vérification du token
+        $('#verify-token').click(function() {
+            const token = $('#token').val();
+            if (!token) {
+                alert('Veuillez entrer votre token Matomo');
+                return;
+            }
+
+            $(this).prop('disabled', true).addClass('loading');
+
+            $.ajax({
+                url: '/verify-token/',
+                method: 'POST',
+                data: { token: token },
+                success: function(response) {
+                    if (response.success) {
+                        $('#verify-token').prop('disabled', false).removeClass('loading');
+                        $('#token-form').fadeOut(300, function() {
+                            $(this).addClass('hidden');
+                            $('#site-selector').removeClass('hidden').hide().fadeIn(300);
+                            
+                            const select = $('#site-id');
+                            select.empty();
+                            select.append('<option value="">Choisissez un site...</option>');
+                            response.sites.forEach(site => {
+                                select.append(`<option value="${site.id}">${site.name}</option>`);
+                            });
+                            
+                            $('#url-form').removeClass('hidden').hide().fadeIn(300);
+                        });
+                    } else {
+                        alert(response.error);
+                    }
+                },
+                error: function() {
+                    alert('Erreur lors de la vérification du token');
+                }
+            });
+        });
+
+        // Gestion du formulaire d'analyse
+        $('#fetch-metrics-form').on('submit', function(e) {
+            e.preventDefault();
+            const siteId = $('#site-id').val();
+            const period = $('#period').val();
+            const [startDate, endDate] = period.split(' - ');
+            
+            let formData = new FormData();
+            formData.append('site_id', siteId);
+            formData.append('start_date', moment(startDate, 'DD/MM/YYYY').format('YYYY-MM-DD'));
+            formData.append('end_date', moment(endDate, 'DD/MM/YYYY').format('YYYY-MM-DD'));
+
+            if ($('.toggle-btn.active').data('method') === 'manual') {
+                formData.append('urls', $('#urls').val());
+            } else {
+                const file = $('#excel-file')[0].files[0];
+                if (!file) {
+                    alert('Veuillez sélectionner un fichier Excel');
+                    return;
+                }
+                formData.append('excel_file', file);
+            }
+
+            $.ajax({
+                url: '/fetch-metrics/',
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        $('#results').removeClass('hidden').hide().fadeIn(300);
+                        $('#analysis-period').text(period);
+                        
+                        let table = `
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>URL</th>
+                                        <th>Visites</th>
+                                        <th>Pages vues uniques</th>
+                                        <th>Taux de rebond</th>
+                                        <th>Temps moyen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+                        
+                        response.metrics.forEach(metric => {
+                            table += `
+                                <tr>
+                                    <td>${metric.url}</td>
+                                    <td>${metric.visits}</td>
+                                    <td>${metric.unique_pageviews}</td>
+                                    <td>${metric.bounce_rate}</td>
+                                    <td>${metric.avg_time}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        table += '</tbody></table>';
+                        $('#metrics-table').html(table);
+                    } else {
+                        alert(response.error);
+                    }
+                },
+                error: function() {
+                    alert('Erreur lors de la récupération des métriques');
+                }
+            });
+        });
+
+        $('#export-excel').on('click', function() {
+            const siteId = $('#site-id').val();
+            window.location.href = `/export-excel/?site_id=${siteId}`;
+        });
+    });
+</script>
+{% endblock %}

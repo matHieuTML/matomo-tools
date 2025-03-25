@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 import requests
 import pandas as pd
@@ -8,6 +8,25 @@ from .models import MatomoSite, AnalyticsResult
 
 def index(request):
     return render(request, 'dashboard/index.html')
+
+def url_analyzer(request):
+    return render(request, 'dashboard/url_analyzer.html')
+
+def export_excel(request):
+    if 'metrics_data' not in request.session:
+        return JsonResponse({'error': 'Aucune donnée à exporter'}, status=400)
+    
+    metrics = request.session['metrics_data']
+    df = pd.DataFrame(metrics)
+    
+    # Créer le fichier Excel en mémoire
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = 'attachment; filename=matomo_metrics.xlsx'
+    
+    # Écrire les données dans le fichier Excel
+    df.to_excel(response, index=False, sheet_name='Métriques')
+    
+    return response
 
 @csrf_exempt
 def verify_token(request):
@@ -19,17 +38,18 @@ def verify_token(request):
         matomo_url = 'https://cidj.matomo.cloud/index.php'
         site_id = 10  # ID du site CIDJ
         
-        # Test simple avec une requête basique de métriques
-        api_url = f'{matomo_url}?module=API&method=Actions.get'
-        api_url += f'&idSite={site_id}&period=day&date=today&format=JSON&token_auth={token}'
+        # Vérifier l'accès avec une requête simple sur les métriques du site CIDJ
+        test_url = f'{matomo_url}?module=API&method=VisitsSummary.get'
+        test_url += f'&idSite={site_id}&period=day&date=today&format=JSON&token_auth={token}'
         
         try:
-            print(f'Tentative de connexion à Matomo avec l\'URL : {api_url}')
-            response = requests.get(api_url)
+            print(f'Vérification du token avec l\'URL : {test_url}')
+            response = requests.get(test_url)
             print(f'Statut de la réponse : {response.status_code}')
             print(f'Contenu de la réponse : {response.text[:500]}')
             
             if response.status_code == 200:
+                # Le token est valide pour le site CIDJ
                 request.session['matomo_token'] = token
                 sites_data = [{
                     'id': site_id,
@@ -40,7 +60,7 @@ def verify_token(request):
                 error_msg = 'Token invalide ou accès refusé'
                 try:
                     error_data = response.json()
-                    if 'message' in error_data:
+                    if isinstance(error_data, dict) and 'message' in error_data:
                         error_msg = error_data['message']
                 except:
                     pass
@@ -56,48 +76,134 @@ def fetch_metrics(request):
     if request.method == 'POST':
         token = request.session.get('matomo_token')
         if not token:
-            return JsonResponse({'success': False, 'error': 'No token found'})
+            return JsonResponse({'success': False, 'error': 'Token manquant'})
             
         site_id = request.POST.get('site_id')
         start_date = request.POST.get('start_date')
         end_date = request.POST.get('end_date')
-        metrics = request.POST.getlist('metrics[]')
-        file = request.FILES.get('urls_file')
         
-        if not all([site_id, start_date, end_date, metrics, file]):
-            return JsonResponse({'success': False, 'error': 'Missing required fields'})
-            
-        # Read URLs from Excel file
-        try:
-            df = pd.read_excel(file)
-            urls = df.iloc[:, 0].tolist()
-        except:
-            return JsonResponse({'success': False, 'error': 'Invalid Excel file'})
+        if not all([site_id, start_date, end_date]):
+            return JsonResponse({'success': False, 'error': 'Dates ou site manquants'})
+        
+        # Récupération des URLs soit depuis le texte, soit depuis le fichier Excel
+        urls_list = []
+        if 'urls' in request.POST:
+            urls = request.POST.get('urls')
+            if urls:
+                urls_list = [url.strip() for url in urls.split('\n') if url.strip()]
+        elif 'excel_file' in request.FILES:
+            try:
+                excel_file = request.FILES['excel_file']
+                df = pd.read_excel(excel_file)
+                
+                # Vérifie si le fichier a au moins une colonne
+                if df.empty or len(df.columns) == 0:
+                    return JsonResponse({'success': False, 'error': 'Le fichier Excel est vide'})
+                
+                # Prend la première colonne comme liste d'URLs
+                urls_list = df.iloc[:, 0].dropna().tolist()
+                urls_list = [str(url).strip() for url in urls_list if str(url).strip()]
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Erreur lors de la lecture du fichier Excel : {str(e)}'})
+        
+        if not urls_list:
+            return JsonResponse({'success': False, 'error': 'Aucune URL fournie'})
             
         results = []
         matomo_url = 'https://cidj.matomo.cloud/index.php'
         
-        for url in urls:
-            api_url = f'{matomo_url}?module=API&method=Actions.getPageUrl'
-            api_url += f'&idSite={site_id}&period=range&date={start_date},{end_date}'
-            api_url += f'&pageUrl={url}&format=JSON&token_auth={token}'
+        for url in urls_list:
+            # Formater l'URL pour qu'elle corresponde au format Matomo
+            try:
+                parsed_url = requests.utils.urlparse(url)
+                path_url = parsed_url.path
+                if not path_url:
+                    path_url = '/'
+            except Exception as e:
+                print(f'Erreur lors du parsing de l\'URL {url}: {str(e)}')
+                path_url = url
+
+            # Récupérer les métriques pour une URL spécifique
+            api_url = f'{matomo_url}'
+            params = {
+                'module': 'API',
+                'method': 'Actions.getPageUrl',
+                'idSite': site_id,
+                'period': 'range',
+                'date': f'{start_date},{end_date}',
+                'pageUrl': path_url,
+                'format': 'json',
+                'token_auth': token,
+                'expanded': 1,
+                'filter_limit': -1
+            }
+            
+            # Afficher l'URL complète pour le débogage
+            full_url = requests.Request('GET', api_url, params=params).prepare().url
+            print(f'\nURL complète de l\'API: {full_url}')
             
             try:
-                response = requests.get(api_url)
+                response = requests.get(api_url, params=params)
+                print(f'\nTraitement de l\'URL: {url}')
+                print(f'Status code: {response.status_code}')
+                print(f'Response content: {response.text}')
+                
                 if response.status_code == 200:
                     data = response.json()
-                    if data and len(data) > 0:
-                        page_data = data[0]
-                        result = {
+                    print(f'Données JSON reçues: {data}')
+                    
+                    # Vérifier si nous avons des données valides
+                    if isinstance(data, dict) and 'result' in data and data['result'] == 'error':
+                        print(f'Erreur API pour {url}: {data.get("message")}')
+                        page_data = None
+                    else:
+                        # L'API retourne une liste, prendre le premier élément s'il existe
+                        page_data = data[0] if isinstance(data, list) and len(data) > 0 else None
+                    
+                    if page_data:
+                        # Extraire les métriques de la réponse
+                        metrics = {
                             'url': url,
-                            'visits': page_data.get('nb_visits', 0),
-                            'pageviews': page_data.get('nb_hits', 0),
-                            'bounce_rate': page_data.get('bounce_rate', '0%')
+                            'visits': page_data['nb_visits'],
+                            'unique_pageviews': page_data['sum_daily_nb_uniq_visitors'],  # Utiliser le bon champ
+                            'bounce_rate': page_data['bounce_rate'],  # Déjà formaté avec %
+                            'avg_time': f"{page_data['avg_time_on_page']}s"
                         }
-                        results.append(result)
-            except:
-                continue
-                
-        return JsonResponse({'success': True, 'results': results})
+                    else:
+                        metrics = {
+                            'url': url,
+                            'visits': 0,
+                            'unique_pageviews': 0,
+                            'bounce_rate': '-',
+                            'avg_time': '-'
+                        }
+                    
+                    print(f'Métriques extraites: {metrics}')
+                    results.append(metrics)
+                else:
+                    print(f'Erreur API pour {url}: {response.status_code}')
+                    results.append({
+                        'url': url,
+                        'visits': 0,
+                        'unique_pageviews': 0,
+                        'bounce_rate': '-',
+                        'avg_time': '-',
+                        'error': f'Erreur API: {response.status_code}'
+                    })
+            except Exception as e:
+                print(f'Exception pour {url}: {str(e)}')
+                results.append({
+                    'url': url,
+                    'visits': 0,
+                    'unique_pageviews': 0,
+                    'bounce_rate': '-',
+                    'avg_time': '-',
+                    'error': str(e)
+                })
         
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+        # Stocker les résultats dans la session
+        request.session['metrics_data'] = results
+        return JsonResponse({'success': True, 'metrics': results})
+    
+    return JsonResponse({'success': False, 'error': 'Méthode invalide'})
+

@@ -1,0 +1,355 @@
+:root {
+    --primary-color: #2D2D2D;
+    --secondary-color: #4F46E5;
+    --background-color: #FAFAFA;
+    --card-background: #FFFFFF;
+    --text-color: #1F2937;
+    --border-radius: 12px;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    padding: 0;
+    margin: 0;
+}
+
+.hero {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: white;
+    padding: 4rem 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.hero p {
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    opacity: 0.9;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.card {
+    background: var(--card-background);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-decoration: none;
+    color: var(--text-color);
+    display: block;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px var(--shadow-color);
+}
+
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.nav {
+    background: white;
+    padding: 1rem 0;
+    box-shadow: 0 1px 3px var(--shadow-color);
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav a {
+    color: var(--text-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.nav a:hover {
+    color: var(--secondary-color);
+}
+
+input[type="text"], textarea, select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #E5E7EB;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+button {
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #4338CA;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+th {
+    background-color: #F9FAFB;
+    font-weight: 500;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card-disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.coming-soon {
+    color: var(--text-color);
+    margin-top: 1rem;
+}
+
+.tool-description {
+    margin-bottom: 1rem;
+}
+
+.action-link {
+    color: var(--secondary-color);
+    margin-top: 1rem;
+    display: inline-block;
+}
+
+.action-link:hover {
+    text-decoration: underline;
+}
+
+/* Styles pour l'analyseur d'URLs */
+.period-selector,
+.input-method-selector {
+    margin-bottom: 2rem;
+}
+
+.period-selector h3,
+.input-method-selector h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.daterange {
+    padding: 0.75rem 1rem;
+    border: 1px solid #E5E7EB;
+    border-radius: var(--border-radius);
+    width: 100%;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: white;
+}
+
+.toggle-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.toggle-btn {
+    background: white;
+    border: 1px solid #E5E7EB;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 1;
+    text-align: center;
+}
+
+.toggle-btn.active {
+    background: var(--secondary-color);
+    color: white;
+    border-color: var(--secondary-color);
+}
+
+.toggle-btn:hover:not(.active) {
+    background: #F9FAFB;
+}
+
+#manual-input,
+#excel-input {
+    margin-bottom: 1.5rem;
+}
+
+.results-period {
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+/* Style pour le sélecteur de fichier Excel */
+input[type="file"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px dashed #E5E7EB;
+    border-radius: var(--border-radius);
+    background: #F9FAFB;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+input[type="file"]:hover {
+    border-color: var(--secondary-color);
+}
+
+/* Styles pour les boutons d'action */
+.mt-3 {
+    margin-top: 1.5rem;
+}
+
+/* Animation de chargement */
+/* Styles pour les formulaires */
+.form-group {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.form-group input {
+    flex: 1;
+}
+
+/* États de chargement */
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: -0.75rem 0 0 -0.75rem;
+    border: 2px solid var(--secondary-color);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Classe utilitaire pour cacher les éléments */
+.hidden {
+    display: none !important;
+}
+
+/* Styles pour le sélecteur de date */
+.daterangepicker {
+    font-family: 'Inter', sans-serif;
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.daterangepicker .ranges li.active {
+    background: var(--secondary-color);
+}
+
+.daterangepicker td.active, 
+.daterangepicker td.active:hover {
+    background: var(--secondary-color);
+}
+
+/* Styles pour les boutons de toggle */
+.toggle-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    background: #F9FAFB;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+}
+
+.toggle-btn {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    background: transparent;
+    color: var(--text-color);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+.toggle-btn:not(.active):hover {
+    background: rgba(255, 255, 255, 0.5);
+}

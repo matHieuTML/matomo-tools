@@ -1,23 +1,36 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matomo Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" rel="stylesheet">
-    <style>
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="mb-4">Matomo Analytics Dashboard</h1>
-        
-        <!-- Étape 1: Token Auth -->
-        <div id="step1" class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">1. Authentification Matomo</h5>
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Matomo Tools - Suite d'outils pour Matomo{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Matomo Tools</h1>
+    <p>Une collection d'outils puissants pour tirer le meilleur parti de vos données Matomo. Simplifiez votre analyse et gagnez du temps avec nos outils spécialisés.</p>
+</div>
+
+<div class="container">
+    <div class="tools-grid">
+        <a href="{% url 'url_analyzer' %}" class="card">
+            <h2>Analyseur d'URLs</h2>
+            <p>Analysez rapidement les performances de plusieurs URLs en même temps. Obtenez les visites et pages vues uniques pour une liste d'URLs et exportez les résultats en Excel.</p>
+            <p class="action-link">Utiliser l'outil →</p>
+        </a>
+
+        <div class="card card-disabled">
+            <h2>Comparateur de périodes</h2>
+            <p>Comparez les performances de vos pages entre différentes périodes. Identifiez les tendances et les variations saisonnières.</p>
+            <p class="coming-soon">Bientôt disponible</p>
+        </div>
+
+        <div class="card card-disabled">
+            <h2>Moniteur de performances</h2>
+            <p>Surveillez en temps réel les performances de vos pages les plus importantes. Recevez des alertes en cas de baisse significative du trafic.</p>
+            <p class="coming-soon">Bientôt disponible</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
                 <div class="mb-3">
                     <label for="tokenAuth" class="form-label">Token Auth Matomo</label>
                     <input type="password" class="form-control" id="tokenAuth" placeholder="Entrez votre token auth">
