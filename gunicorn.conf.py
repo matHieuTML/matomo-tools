@@ -1,7 +1,9 @@
 import multiprocessing
 
-# Nombre de workers basé sur le nombre de cœurs CPU
-workers = multiprocessing.cpu_count() * 2 + 1
+# Configuration minimale pour Railway
+workers = 2
+threads = 2
+worker_connections = 1000
 
 # Type de worker
 worker_class = 'sync'
