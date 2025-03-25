@@ -1,1 +1,1 @@
-web: gunicorn matomo_dashboard.wsgi --log-file -
+web: python manage.py collectstatic --no-input && gunicorn matomo_dashboard.wsgi -c gunicorn.conf.py
