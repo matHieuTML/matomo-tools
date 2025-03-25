@@ -89,14 +89,35 @@ body {
     align-items: center;
 }
 
-.nav a {
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.matomo-logo {
+    height: 24px;
+    width: auto;
+    transition: all 0.3s ease;
+}
+
+.nav-title:hover ~ .matomo-logo,
+.matomo-logo:hover,
+.nav-brand:hover .matomo-logo {
+    filter: invert(40%) sepia(89%) saturate(2242%) hue-rotate(235deg) brightness(103%) contrast(94%);
+}
+
+.nav-title {
     color: var(--text-color);
     text-decoration: none;
     font-weight: 500;
+    transition: color 0.3s ease;
 }
 
-.nav a:hover {
-    color: var(--secondary-color);
+.nav-title:hover,
+.matomo-logo:hover ~ .nav-title,
+.nav-brand:hover .nav-title {
+    color: #4F46E5;
 }
 
 input[type="text"], textarea, select {
