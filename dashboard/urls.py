@@ -7,4 +7,6 @@ urlpatterns = [
     path('verify-token/', views.verify_token, name='verify_token'),
     path('fetch-metrics/', views.fetch_metrics, name='fetch_metrics'),
     path('export-excel/', views.export_excel, name='export_excel'),
+    path('ai-assistant/', views.ai_assistant, name='ai_assistant'),
+    path('proxy-matomo/', views.proxy_matomo_api, name='proxy_matomo'),
 ]

@@ -9,6 +9,27 @@ from .models import MatomoSite, AnalyticsResult
 def index(request):
     return render(request, 'dashboard/index.html')
 
+def ai_assistant(request):
+    return render(request, 'dashboard/ai_assistant.html')
+
+@csrf_exempt
+def proxy_matomo_api(request):
+    if request.method == 'POST':
+        try:
+            api_url = request.POST.get('url')
+            if not api_url:
+                return JsonResponse({'error': 'URL manquante'}, status=400)
+
+            response = requests.get(api_url)
+            return JsonResponse(response.json(), safe=False)
+
+        except requests.RequestException as e:
+            return JsonResponse({'error': str(e)}, status=500)
+        except ValueError as e:
+            return JsonResponse({'error': 'Réponse invalide de Matomo'}, status=500)
+
+    return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+
 def url_analyzer(request):
     return render(request, 'dashboard/url_analyzer.html')
 
