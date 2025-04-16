@@ -9,7 +9,30 @@
 </div>
 
 <div class="container">
-    <div class="tools-grid">
+    <!-- Configuration Matomo -->
+    <div id="matomo-config" class="card fade-in mb-4">
+        <h2>Configuration Matomo</h2>
+        <div class="form-group mb-3">
+            <label for="matomo-url">URL Matomo</label>
+            <input type="url" id="matomo-url" class="form-control" placeholder="https://votre-instance.matomo.cloud" required>
+            <small class="text-muted">L'URL de votre instance Matomo (ex: https://example.matomo.cloud)</small>
+        </div>
+        <div class="form-group mb-3">
+            <label for="matomo-token">Token d'authentification</label>
+            <input type="password" id="matomo-token" class="form-control" placeholder="Votre token auth" required>
+            <small class="text-muted">Trouvable dans les paramètres de votre compte Matomo sous "Sécurité"</small>
+        </div>
+        <div id="site-selector" class="form-group mb-3 hidden">
+            <label for="site-id">Site Matomo</label>
+            <select id="site-id" class="form-control" required disabled>
+                <option value="">Sélectionnez un site...</option>
+            </select>
+        </div>
+        <button type="button" id="verify-config" class="btn btn-primary">Vérifier la configuration</button>
+    </div>
+
+    <!-- Outils disponibles -->
+    <div id="tools-grid" class="tools-grid hidden">
         <a href="{% url 'url_analyzer' %}" class="card">
             <h2>Analyseur d'URLs</h2>
             <p>Analysez rapidement les performances de plusieurs URLs en même temps. Obtenez les visites et pages vues uniques pour une liste d'URLs et exportez les résultats en Excel.</p>
@@ -29,6 +52,135 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+$(document).ready(function() {
+    // Vérifier si des configurations sont en cache
+    const cachedConfig = localStorage.getItem('matomoConfig');
+    if (cachedConfig) {
+        const config = JSON.parse(cachedConfig);
+        $('#matomo-url').val(config.url);
+        $('#matomo-token').val(config.token);
+        verifyConfiguration(true);
+    }
+
+    // Gestionnaire de vérification de la configuration
+    $('#verify-config').click(function() {
+        verifyConfiguration(false);
+    });
+
+    // Fonction de vérification de la configuration
+    function verifyConfiguration(isAutoLoad) {
+        const url = $('#matomo-url').val().trim();
+        const token = $('#matomo-token').val().trim();
+
+        console.log('Vérification de la configuration Matomo');
+        console.log('URL:', url);
+
+        if (!url || !token) {
+            console.error('Champs manquants');
+            alert('Veuillez remplir tous les champs');
+            return;
+        }
+
+        // Préparer les données pour l'API
+        const formData = new FormData();
+        formData.append('url', url);
+        formData.append('token', token);
+
+        // Afficher l'état de chargement
+        const button = $('#verify-config');
+        button.prop('disabled', true).text('Vérification...');
+
+        // Créer ou mettre à jour le message de statut
+        let statusDiv = $('#status-message');
+        if (statusDiv.length === 0) {
+            statusDiv = $('<div id="status-message" class="alert alert-info mt-3">Vérification de la connexion à Matomo...</div>');
+            button.after(statusDiv);
+        } else {
+            statusDiv.removeClass('alert-danger alert-success').addClass('alert-info')
+                    .text('Vérification de la connexion à Matomo...');
+        }
+
+        console.log('Envoi de la requête de vérification...');
+
+        // Appeler notre API de vérification
+        fetch('/verify-matomo-config/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            console.log('Réponse reçue - Status:', response.status);
+            return response.json().then(data => {
+                if (!response.ok) {
+                    throw new Error(data.error || `Erreur HTTP ${response.status}`);
+                }
+                return data;
+            });
+        })
+        .then(data => {
+            console.log('Données reçues:', data);
+
+            // Sauvegarder la configuration dans le localStorage
+            const config = {
+                url: url,
+                token: token
+            };
+            console.log('Sauvegarde de la configuration');
+            localStorage.setItem('matomoConfig', JSON.stringify(config));
+
+            // Remplir le sélecteur de sites
+            const select = $('#site-id');
+            select.empty().append('<option value="">Sélectionnez un site...</option>');
+            console.log(`Ajout de ${data.sites.length} sites au sélecteur`);
+            data.sites.forEach(site => {
+                select.append(`<option value="${site.id}">${site.name}</option>`);
+            });
+
+            // Afficher le sélecteur de sites et activer le select
+            $('#site-selector').removeClass('hidden');
+            select.prop('disabled', false);
+
+            // Si un site était précédemment sélectionné, le restaurer
+            const cachedSiteId = localStorage.getItem('matomoSiteId');
+            if (cachedSiteId) {
+                select.val(cachedSiteId);
+            }
+
+            // Afficher les outils une fois la configuration validée
+            $('#tools-grid').removeClass('hidden');
+
+            // Mettre à jour le message de statut
+            statusDiv.removeClass('alert-info').addClass('alert-success')
+                    .text('Configuration vérifiée avec succès !');
+
+            if (!isAutoLoad) {
+                console.log('Configuration validée avec succès');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors de la vérification:', error);
+            statusDiv.removeClass('alert-info').addClass('alert-danger')
+                    .text(`Erreur : ${error.message}. Vérifiez vos informations de connexion.`);
+        })
+        .finally(() => {
+            button.prop('disabled', false).text('Vérifier la configuration');
+        });
+    }
+
+    // Gestionnaire de changement de site
+    $('#site-id').change(function() {
+        const siteId = $(this).val();
+        if (siteId) {
+            localStorage.setItem('matomoSiteId', siteId);
+        } else {
+            localStorage.removeItem('matomoSiteId');
+        }
+    });
+});
+</script>
 {% endblock %}
 
                 <div class="mb-3">

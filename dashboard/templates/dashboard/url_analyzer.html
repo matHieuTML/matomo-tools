@@ -11,19 +11,14 @@
 </div>
 
 <div class="container">
-    <div id="token-form" class="card fade-in">
-        <h2>Connexion à Matomo</h2>
-        <p>Pour commencer, connectez-vous avec votre token d'authentification Matomo. Vous pouvez le trouver dans les paramètres de votre compte Matomo sous "Sécurité".</p>
-        <div class="form-group">
-            <input type="text" id="token" name="token" placeholder="Votre token Matomo" required>
-            <button type="button" id="verify-token">Se connecter</button>
-        </div>
+    <div id="config-check" class="card fade-in">
+        <h2>Vérification de la configuration</h2>
+        <p>Vérification de votre configuration Matomo...</p>
     </div>
 
-    <div id="site-selector" class="card fade-in hidden">
-        <h2>Sélection du site</h2>
-        <p>Choisissez le site pour lequel vous souhaitez analyser les métriques.</p>
-        <select id="site-id" aria-label="Sélectionner un site Matomo" title="Site Matomo"></select>
+    <div id="config-error" class="card fade-in hidden">
+        <h2>Configuration manquante</h2>
+        <p>Veuillez d'abord configurer vos paramètres Matomo sur la <a href="{% url 'index' %}">page d'accueil</a>.</p>
     </div>
 
     <div id="url-form" class="card fade-in hidden">
@@ -68,6 +63,20 @@
 {% block extra_scripts %}
 <script>
     $(document).ready(function() {
+        // Vérifier la configuration Matomo
+        const config = JSON.parse(localStorage.getItem('matomoConfig') || '{}');
+        const siteId = localStorage.getItem('matomoSiteId');
+
+        if (!config.url || !config.token || !siteId) {
+            $('#config-check').addClass('hidden');
+            $('#config-error').removeClass('hidden');
+            return;
+        }
+
+        // Afficher le formulaire d'analyse
+        $('#config-check').addClass('hidden');
+        $('#url-form').removeClass('hidden');
+
         // Configuration du sélecteur de période
         $('#period').daterangepicker({
             startDate: moment().subtract(7, 'days'),
@@ -114,50 +123,12 @@
             }
         });
 
-        // Gestion de la vérification du token
-        $('#verify-token').click(function() {
-            const token = $('#token').val();
-            if (!token) {
-                alert('Veuillez entrer votre token Matomo');
-                return;
-            }
 
-            $(this).prop('disabled', true).addClass('loading');
-
-            $.ajax({
-                url: '/verify-token/',
-                method: 'POST',
-                data: { token: token },
-                success: function(response) {
-                    if (response.success) {
-                        $('#verify-token').prop('disabled', false).removeClass('loading');
-                        $('#token-form').fadeOut(300, function() {
-                            $(this).addClass('hidden');
-                            $('#site-selector').removeClass('hidden').hide().fadeIn(300);
-                            
-                            const select = $('#site-id');
-                            select.empty();
-                            select.append('<option value="">Choisissez un site...</option>');
-                            response.sites.forEach(site => {
-                                select.append(`<option value="${site.id}">${site.name}</option>`);
-                            });
-                            
-                            $('#url-form').removeClass('hidden').hide().fadeIn(300);
-                        });
-                    } else {
-                        alert(response.error);
-                    }
-                },
-                error: function() {
-                    alert('Erreur lors de la vérification du token');
-                }
-            });
-        });
 
         // Gestion du formulaire d'analyse
         $('#fetch-metrics-form').on('submit', function(e) {
             e.preventDefault();
-            const siteId = $('#site-id').val();
+            const siteId = localStorage.getItem('matomoSiteId'); 
             const period = $('#period').val();
             const [startDate, endDate] = period.split(' - ');
             
@@ -165,6 +136,8 @@
             formData.append('site_id', siteId);
             formData.append('start_date', moment(startDate, 'DD/MM/YYYY').format('YYYY-MM-DD'));
             formData.append('end_date', moment(endDate, 'DD/MM/YYYY').format('YYYY-MM-DD'));
+            formData.append('matomo_url', config.url);
+            formData.append('token', config.token);
 
             if ($('.toggle-btn.active').data('method') === 'manual') {
                 formData.append('urls', $('#urls').val());
@@ -230,7 +203,7 @@
         });
 
         $('#export-excel').on('click', function() {
-            const siteId = $('#site-id').val();
+            const siteId = localStorage.getItem('matomoSiteId'); 
             window.location.href = `/export-excel/?site_id=${siteId}`;
         });
     });

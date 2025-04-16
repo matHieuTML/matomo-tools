@@ -5,9 +5,88 @@ import requests
 import pandas as pd
 from datetime import datetime
 from .models import MatomoSite, AnalyticsResult
+from django.core.cache import cache
 
 def index(request):
     return render(request, 'dashboard/index.html')
+
+@csrf_exempt
+def verify_matomo_config(request):
+    if request.method == 'POST':
+        url = request.POST.get('url')
+        token = request.POST.get('token')
+        
+        print(f"Vérification de la configuration Matomo - URL: {url}")
+        
+        if not url or not token:
+            print("Erreur: URL ou token manquant")
+            return JsonResponse({'error': 'URL et token requis'}, status=400)
+        
+        # Nettoyer l'URL si nécessaire
+        url = url.rstrip('/')
+        if not url.startswith('http'):
+            url = f'https://{url}'
+        
+        # Construire l'URL de l'API pour récupérer les sites
+        api_url = f"{url}/index.php?module=API&method=SitesManager.getSitesWithAtLeastViewAccess&format=json&token_auth={token}"
+        print(f"Tentative de connexion à l'API Matomo: {api_url}")
+        
+        try:
+            response = requests.get(api_url, timeout=10)  # Timeout de 10 secondes
+            print(f"Réponse de l'API - Status: {response.status_code}")
+            print(f"Contenu de la réponse: {response.text[:500]}...")
+            
+            data = response.json()
+            print(f"Type de données reçu: {type(data)}")
+            
+            # Vérifier si nous avons une erreur dans la réponse
+            if isinstance(data, dict) and data.get('result') == 'error':
+                error_msg = data.get('message', 'Erreur inconnue')
+                print(f"Erreur de l'API: {error_msg}")
+                return JsonResponse({'error': f'Erreur Matomo: {error_msg}'}, status=400)
+            
+            # Vérifier si nous avons une liste de sites ou un dictionnaire de sites
+            sites_data = data if isinstance(data, list) else data.get('value', [])
+            
+            if not isinstance(sites_data, list):
+                print(f"Format de réponse invalide: {data}")
+                return JsonResponse({'error': 'Réponse invalide de lèAPI Matomo'}, status=400)
+            
+            # Stocker la configuration dans le cache Django
+            cache.set('matomo_config', {
+                'url': url,
+                'token': token
+            }, timeout=86400)  # Cache pour 24 heures
+            
+            # Convertir les données en liste de sites
+            sites = [{'id': site.get('idsite'), 'name': site.get('name')} for site in sites_data if site.get('idsite')]
+            print(f"Sites trouvés: {len(sites)}")
+            
+            return JsonResponse({
+                'success': True,
+                'sites': sites
+            })
+                
+        except requests.exceptions.Timeout:
+            print("Timeout de la requête API")
+            return JsonResponse({'error': 'Timeout de la connexion à Matomo'}, status=500)
+        except requests.exceptions.SSLError as e:
+            print(f"Erreur SSL: {str(e)}")
+            return JsonResponse({'error': 'Erreur de sécurité SSL'}, status=500)
+        except requests.exceptions.ConnectionError as e:
+            print(f"Erreur de connexion: {str(e)}")
+            return JsonResponse({'error': 'Impossible de se connecter à Matomo'}, status=500)
+        except requests.RequestException as e:
+            print(f"Erreur de requête: {str(e)}")
+            return JsonResponse({'error': f'Erreur de connexion : {str(e)}'}, status=500)
+        except ValueError as e:
+            print(f"Erreur de parsing JSON: {str(e)}")
+            return JsonResponse({'error': 'Réponse invalide de Matomo'}, status=500)
+        except Exception as e:
+            print(f"Erreur inattendue: {str(e)}")
+            return JsonResponse({'error': f'Erreur inattendue: {str(e)}'}, status=500)
+    
+    return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
 
 def ai_assistant(request):
     return render(request, 'dashboard/ai_assistant.html')
@@ -95,16 +174,14 @@ def verify_token(request):
 @csrf_exempt
 def fetch_metrics(request):
     if request.method == 'POST':
-        token = request.session.get('matomo_token')
-        if not token:
-            return JsonResponse({'success': False, 'error': 'Token manquant'})
-            
+        matomo_url = request.POST.get('matomo_url')
+        token = request.POST.get('token')
         site_id = request.POST.get('site_id')
         start_date = request.POST.get('start_date')
         end_date = request.POST.get('end_date')
         
-        if not all([site_id, start_date, end_date]):
-            return JsonResponse({'success': False, 'error': 'Dates ou site manquants'})
+        if not all([matomo_url, token, site_id, start_date, end_date]):
+            return JsonResponse({'success': False, 'error': 'Paramètres manquants'})
         
         # Récupération des URLs soit depuis le texte, soit depuis le fichier Excel
         urls_list = []
@@ -131,31 +208,26 @@ def fetch_metrics(request):
             return JsonResponse({'success': False, 'error': 'Aucune URL fournie'})
             
         results = []
-        matomo_url = 'https://cidj.matomo.cloud/index.php'
+        api_url = f'{matomo_url}/index.php'
         
         for url in urls_list:
             # Formater l'URL pour qu'elle corresponde au format Matomo
             try:
-                parsed_url = requests.utils.urlparse(url)
-                path_url = parsed_url.path
-                if not path_url:
-                    path_url = '/'
+                if not url.startswith('http'):
+                    url = f'https://{url}'
             except Exception as e:
                 print(f'Erreur lors du parsing de l\'URL {url}: {str(e)}')
-                path_url = url
 
             # Récupérer les métriques pour une URL spécifique
-            api_url = f'{matomo_url}'
             params = {
                 'module': 'API',
                 'method': 'Actions.getPageUrl',
                 'idSite': site_id,
                 'period': 'range',
                 'date': f'{start_date},{end_date}',
-                'pageUrl': path_url,
+                'pageUrl': url,
                 'format': 'json',
                 'token_auth': token,
-                'expanded': 1,
                 'filter_limit': -1
             }
             
@@ -227,4 +299,3 @@ def fetch_metrics(request):
         return JsonResponse({'success': True, 'metrics': results})
     
     return JsonResponse({'success': False, 'error': 'Méthode invalide'})
-
