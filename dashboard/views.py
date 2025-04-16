@@ -28,11 +28,19 @@ def verify_matomo_config(request):
             url = f'https://{url}'
         
         # Construire l'URL de l'API pour récupérer les sites
-        api_url = f"{url}/index.php?module=API&method=SitesManager.getSitesWithAtLeastViewAccess&format=json&token_auth={token}"
+        api_url = f"{url}/index.php"
+        params = {
+            'module': 'API',
+            'method': 'SitesManager.getSitesWithAtLeastViewAccess',
+            'format': 'json'
+        }
+        data = {
+            'token_auth': token
+        }
         print(f"Tentative de connexion à l'API Matomo: {api_url}")
         
         try:
-            response = requests.get(api_url, timeout=10)  # Timeout de 10 secondes
+            response = requests.post(api_url, params=params, data=data, timeout=10)  # Timeout de 10 secondes
             print(f"Réponse de l'API - Status: {response.status_code}")
             print(f"Contenu de la réponse: {response.text[:500]}...")
             

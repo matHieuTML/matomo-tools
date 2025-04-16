@@ -22,13 +22,16 @@
             <input type="password" id="matomo-token" class="form-control" placeholder="Votre token auth" required>
             <small class="text-muted">Trouvable dans les paramètres de votre compte Matomo sous "Sécurité"</small>
         </div>
-        <div id="site-selector" class="form-group mb-3 hidden">
+        <div id="site-selector" class="form-group hidden">
             <label for="site-id">Site Matomo</label>
             <select id="site-id" class="form-control" required disabled>
                 <option value="">Sélectionnez un site...</option>
             </select>
         </div>
-        <button type="button" id="verify-config" class="btn btn-primary">Vérifier la configuration</button>
+        <div class="button-group">
+            <button type="button" id="verify-config" class="btn btn-primary">Vérifier la configuration</button>
+            <button type="button" id="reset-config" class="btn btn-danger">Réinitialiser la configuration</button>
+        </div>
     </div>
 
     <!-- Outils disponibles -->
@@ -69,6 +72,28 @@ $(document).ready(function() {
     // Gestionnaire de vérification de la configuration
     $('#verify-config').click(function() {
         verifyConfiguration(false);
+    });
+
+    // Gestionnaire de réinitialisation de la configuration
+    $('#reset-config').click(function() {
+        if (confirm('Êtes-vous sûr de vouloir réinitialiser la configuration ? Cela effacera vos paramètres actuels.')) {
+            // Effacer le localStorage
+            localStorage.removeItem('matomoConfig');
+            localStorage.removeItem('matomoSiteId');
+
+            // Réinitialiser les champs
+            $('#matomo-url').val('');
+            $('#matomo-token').val('');
+            $('#site-id').empty().append('<option value="">Sélectionnez un site...</option>').prop('disabled', true);
+            $('#site-selector').addClass('hidden');
+            $('#tools-grid').addClass('hidden');
+
+            // Supprimer les messages de statut
+            $('#status-message').remove();
+
+            // Recharger la page pour réinitialiser complètement l'état
+            location.reload();
+        }
     });
 
     // Fonction de vérification de la configuration
@@ -182,217 +207,3 @@ $(document).ready(function() {
 });
 </script>
 {% endblock %}
-
-                <div class="mb-3">
-                    <label for="tokenAuth" class="form-label">Token Auth Matomo</label>
-                    <input type="password" class="form-control" id="tokenAuth" placeholder="Entrez votre token auth">
-                </div>
-                <button id="verifyToken" class="btn btn-primary">Vérifier le token</button>
-            </div>
-        </div>
-
-        <!-- Étape 2: Sélection du site -->
-        <div id="step2" class="card mb-4 hidden">
-            <div class="card-body">
-                <h5 class="card-title">2. Sélection du site</h5>
-                <div class="mb-3">
-                    <label for="siteSelect" class="form-label">Choisir un site</label>
-                    <select class="form-select" id="siteSelect"></select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Étape 3: Configuration des métriques -->
-        <div id="step3" class="card mb-4 hidden">
-            <div class="card-body">
-                <h5 class="card-title">3. Configuration</h5>
-                <div class="mb-3">
-                    <label for="dateRange" class="form-label">Période</label>
-                    <input type="text" class="form-control" id="dateRange">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Métriques</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="visits" id="metricVisits" checked>
-                        <label class="form-check-label" for="metricVisits">Visites</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="pageviews" id="metricPageviews" checked>
-                        <label class="form-check-label" for="metricPageviews">Pages vues</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="bounce_rate" id="metricBounce" checked>
-                        <label class="form-check-label" for="metricBounce">Taux de rebond</label>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label for="urlsFile" class="form-label">Fichier Excel des URLs</label>
-                    <input type="file" class="form-control" id="urlsFile" accept=".xlsx,.xls">
-                </div>
-                <button id="fetchMetrics" class="btn btn-primary">Récupérer les métriques</button>
-            </div>
-        </div>
-
-        <!-- Résultats -->
-        <div id="results" class="card hidden">
-            <div class="card-body">
-                <h5 class="card-title">Résultats</h5>
-                <div class="table-responsive">
-                    <table class="table table-striped" id="resultsTable">
-                        <thead>
-                            <tr>
-                                <th>URL</th>
-                                <th>Visites</th>
-                                <th>Pages vues</th>
-                                <th>Taux de rebond</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <button id="exportExcel" class="btn btn-success mt-3">Exporter en Excel</button>
-            </div>
-        </div>
-    </div>
-
-
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    {% csrf_token %}
-    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    
-    <script>
-        $(document).ready(function() {
-            // Configuration CSRF token pour toutes les requêtes AJAX
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            $.ajaxSetup({
-                headers: {
-                    'X-CSRFToken': csrftoken
-                }
-            });
-            // Configuration du sélecteur de dates
-            $('#dateRange').daterangepicker({
-                locale: {
-                    format: 'YYYY-MM-DD'
-                }
-            });
-
-            // Vérification du token
-            $('#verifyToken').click(function() {
-                const token = $('#tokenAuth').val();
-                if (!token) {
-                    alert('Veuillez entrer un token');
-                    return;
-                }
-
-                $('#verifyToken').prop('disabled', true).text('Vérification...');
-                
-                $.ajax({
-                    url: '/verify-token/',
-                    type: 'POST',
-                    data: { token: token },
-                    headers: {
-                        'X-CSRFToken': csrftoken
-                    }
-                })
-                .done(function(response) {
-                    if (response.success) {
-                        $('#step1').addClass('hidden');
-                        $('#step2').removeClass('hidden');
-                        
-                        // Remplir le select des sites
-                        const select = $('#siteSelect');
-                        select.empty();
-                        response.sites.forEach(site => {
-                            select.append(`<option value="${site.id}">${site.name}</option>`);
-                        });
-                        
-                        $('#step3').removeClass('hidden');
-                    } else {
-                        alert(response.error || 'Token invalide');
-                        $('#verifyToken').prop('disabled', false).text('Vérifier le token');
-                    }
-                })
-                .fail(function(jqXHR) {
-                    alert(jqXHR.responseJSON?.error || 'Erreur de connexion à Matomo');
-                    $('#verifyToken').prop('disabled', false).text('Vérifier le token');
-                });
-            });
-
-            // Récupération des métriques
-            $('#fetchMetrics').click(function() {
-                const siteId = $('#siteSelect').val();
-                const dateRange = $('#dateRange').val().split(' - ');
-                const metrics = [];
-                $('input[type=checkbox]:checked').each(function() {
-                    metrics.push($(this).val());
-                });
-                const file = $('#urlsFile')[0].files[0];
-
-                if (!siteId || !dateRange || metrics.length === 0 || !file) {
-                    alert('Veuillez remplir tous les champs');
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('site_id', siteId);
-                formData.append('start_date', dateRange[0]);
-                formData.append('end_date', dateRange[1]);
-                metrics.forEach(metric => formData.append('metrics[]', metric));
-                formData.append('urls_file', file);
-
-                $('#loading').removeClass('hidden');
-                $.ajax({
-                    url: '/fetch-metrics/',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(response) {
-                        if (response.success) {
-                            displayResults(response.results);
-                        } else {
-                            alert(response.error || 'Une erreur est survenue');
-                        }
-                    },
-                    error: function() {
-                        alert('Erreur de connexion');
-                    },
-                    complete: function() {
-                        $('#fetchMetrics').prop('disabled', false).text('Récupérer les métriques');
-                    }
-                });
-            });
-
-            // Affichage des résultats
-            function displayResults(results) {
-                const tbody = $('#resultsTable tbody');
-                tbody.empty();
-                
-                results.forEach(result => {
-                    tbody.append(`
-                        <tr>
-                            <td>${result.url}</td>
-                            <td>${result.visits}</td>
-                            <td>${result.pageviews}</td>
-                            <td>${result.bounce_rate}</td>
-                        </tr>
-                    `);
-                });
-
-                $('#results').removeClass('hidden');
-            }
-
-            // Export Excel
-            $('#exportExcel').click(function() {
-                const table = document.getElementById('resultsTable');
-                const wb = XLSX.utils.table_to_book(table, {sheet: "Résultats"});
-                XLSX.writeFile(wb, `matomo_stats_${moment().format('YYYY-MM-DD_HH-mm')}.xlsx`);
-            });
-        });
-    </script>
-</body>
-</html>
